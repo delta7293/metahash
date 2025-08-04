@@ -151,11 +151,12 @@ async def average_price(
         try:
             return (await sub.subnet(netuid, block=blk)).price.rao
         except Exception:
-            price_rao = await sub.query_runtime_api(
-                "StakeInfoRuntimeApi",
-                "get_subnet_price_at",
-                params=[netuid, blk],
-            )
+            # price_rao = await sub.query_runtime_api(
+            #     "StakeInfoRuntimeApi",
+            #     "get_subnet_price_at",
+            #     params=[netuid, blk],
+            # )
+            price_rao = None
             return int(price_rao)
 
     prices: List[int] = []
