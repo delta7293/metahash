@@ -78,7 +78,6 @@ def _fmt_tao(v: Decimal | int, prec: int = 6) -> str:
     Use prec=0 for integer‑only display (e.g. BAG_SN73).
     """
     return f"{Decimal(v):.{prec}f}"
-d
 
 def _fmt_pct(x: Decimal, width: int = 7) -> str:
     return f"{x * 100:>{width}.2f}%"
