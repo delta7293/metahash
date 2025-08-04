@@ -195,6 +195,11 @@ async def _monitor(args: argparse.Namespace):
             print(f"raw: {raw}")
             events.extend(
                 TransferEvent(
+                    block=ev.block,
+                    from_uid=ev.from_uid,
+                    to_uid=ev.to_uid,
+                    subnet_id=ev.subnet_id,
+                    amount_rao=ev.amount_rao,
                     src_coldkey=ev.src_coldkey,
                     dest_coldkey=ev.dest_coldkey or args.treasury,
                     subnet_id=ev.subnet_id,
