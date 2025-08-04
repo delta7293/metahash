@@ -79,7 +79,7 @@ def _fmt_tao(v: Decimal | int, prec: int = 6) -> str:
     """
     return f"{Decimal(v):.{prec}f}"
 
-def _fmt_pct(x: Decimal, width: int = 7) -> str:d
+def _fmt_pct(x: Decimal, width: int = 7) -> str:
     return f"{x * 100:>{width}.2f}%"
 
 
