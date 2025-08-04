@@ -192,6 +192,7 @@ async def _monitor(args: argparse.Namespace):
         if next_block <= head:
             info(f"Scanner: frm={next_block}  to={head}")
             raw = await scanner.scan(next_block, head)
+            print(f"raw: {raw}")
             events.extend(
                 TransferEvent(
                     src_coldkey=ev.src_coldkey,
