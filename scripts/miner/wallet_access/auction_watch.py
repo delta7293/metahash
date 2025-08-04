@@ -225,7 +225,7 @@ async def _monitor(args: argparse.Namespace):
             end_block=head,
             pool_depth_of=depth_provider,
         )
-
+        print(f"rewards: {rewards}")
         tao_by_uid = {uid: Decimal(r) for uid, r in enumerate(rewards)}
         total_tao = sum(tao_by_uid.values())
         my_tao_spent = tao_by_uid.get(my_uid, Decimal(0)) if my_uid is not None else Decimal(0)
