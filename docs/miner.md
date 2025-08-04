@@ -88,10 +88,11 @@ btcli subnets register \
 - Leaderboard:
 ```bash
 python scripts/leaderboard.py --meta-netuid 73 --wallet.name YOUR_WALLET --wallet.hotkey YOUR_HOTKEY --network archive
+python scripts/miner/leaderboard.py --meta-netuid 73 --wallet.name miner_mainnet --wallet.hotkey default --network archive
 ```
 - Automatic Bidder
 ```bash
-python scripts/wallet_access/auction_watch.py --netuid SOURCE_SUBNET_ID --source-hotkey SOURCE_HOTKEY_ADDRESS --wallet.name YOUR_WALLET --wallet.hotkey YOUR_HOTKEY --max-alpha 100 --step-alpha 5 --max-discount 8
+python scripts/miner/wallet_access/auction_watch.py --netuid 87 --source-hotkey 5G9eP75EjcJeBY1vizPN7sfNNUWtonxgjpRtczFAQccfHkYa --wallet.name miner_mainnet --wallet.hotkey default --max-alpha 50 --step-alpha 25 --max-discount 8
 ```
 
 ```bash

@@ -194,10 +194,15 @@ async def _monitor(args: argparse.Namespace):
             raw = await scanner.scan(next_block, head)
             events.extend(
                 TransferEvent(
-                    src_coldkey=ev.src_coldkey,
-                    dest_coldkey=ev.dest_coldkey or args.treasury,
+                    block=ev.block,
+                    from_uid=ev.from_uid,
+                    to_uid=ev.to_uid,
                     subnet_id=ev.subnet_id,
                     amount_rao=ev.amount_rao,
+                    src_coldkey=ev.src_coldkey,
+                    dest_coldkey=ev.dest_coldkey or args.treasury,
+                    src_coldkey_raw=ev.src_coldkey_raw,
+                    dest_coldkey_raw=ev.dest_coldkey_raw,
                 )
                 for ev in raw
             )
