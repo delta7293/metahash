@@ -151,13 +151,20 @@ async def average_price(
         try:
             return (await sub.subnet(netuid, block=blk)).price.rao
         except Exception:
-            # price_rao = await sub.query_runtime_api(
-            #     "StakeInfoRuntimeApi",
-            #     "get_subnet_price_at",
-            #     params=[netuid, blk],
-            # )
-            price_rao = None
-            return int(price_rao)
+            try:
+                price_rao = await sub.query_runtime_api(
+                    "StakeInfoRuntimeApi",
+                    "get_subnet_price_at",
+                    params=[netuid, blk],
+                )
+                if price_rao is None:
+                    raise ValueError(f"No price returned for block {blk}")
+                return int(price_rao)
+            except Exception as e:
+                # Optional: log this error for debugging
+                print(f"Failed to fetch price at block {blk}: {e}")
+                return 0  # or another default like -1 or raise again
+
 
     prices: List[int] = []
     async with _with_subtensor(st) as sub:
