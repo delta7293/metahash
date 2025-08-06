@@ -304,27 +304,69 @@ async def _monitor(args: argparse.Namespace):
         )
 
         # ───────── maybe bid ─────────
-        if autobid and autobit_count < 5 and extra_alpha > 0 and loss_after <= args.max_discount:
-            try:
-                ok = await transfer_alpha(
-                    subtensor=st,
-                    wallet=wallet,
-                    hotkey_ss58=args.source_hotkey,
-                    origin_and_dest_netuid=args.netuid,
-                    dest_coldkey_ss58=args.treasury,
-                    amount=bt.Balance.from_tao(extra_alpha),
-                    wait_for_inclusion=True,
-                    wait_for_finalization=False,
-                )
-            except Exception as exc:
-                warn(f"transfer_alpha failed: {exc}")
-                ok = False
-            if ok:
-                alpha_sent += extra_alpha
-                clog.success(f"AUTO‑BID sent {extra_alpha} α "
-                             f"(cum {alpha_sent}) "
-                             f"{_fmt_margin(future_margin, colour=False)}")
-            autobit_count += 1
+        if autobid and autobit_count < 5:
+            if extra_alpha > 0 and loss_after <= args.max_discount:
+                try:
+                    ok = await transfer_alpha(
+                        subtensor=st,
+                        wallet=wallet,
+                        hotkey_ss58=args.source_hotkey,
+                        origin_and_dest_netuid=args.netuid,
+                        dest_coldkey_ss58=args.treasury,
+                        amount=bt.Balance.from_tao(extra_alpha),
+                        wait_for_inclusion=True,
+                        wait_for_finalization=False,
+                    )
+                except Exception as exc:
+                    warn(f"transfer_alpha failed: {exc}")
+                    ok = False
+                if ok:
+                    alpha_sent += extra_alpha
+                    clog.success(f"AUTO‑BID sent {extra_alpha} α "
+                                f"(cum {alpha_sent}) "
+                                f"{_fmt_margin(future_margin, colour=False)}")
+                autobit_count += 1
+            elif extra_alpha == 0 and loss_after > args.max_discount:
+                try:
+                    ok = await transfer_alpha(
+                        subtensor=st,
+                        wallet=wallet,
+                        hotkey_ss58=args.source_hotkey,
+                        origin_and_dest_netuid=args.netuid,
+                        dest_coldkey_ss58=args.treasury,
+                        amount=bt.Balance.from_tao(2),
+                        wait_for_inclusion=True,
+                        wait_for_finalization=False,
+                    )
+                except Exception as exc:
+                    warn(f"transfer_alpha failed: {exc}")
+                    ok = False
+                if ok:
+                    alpha_sent += 1
+                    clog.success(f"AUTO‑BID sent {extra_alpha} α "
+                                f"(cum {2}) "
+                                f"{_fmt_margin(future_margin, colour=False)}")
+            elif extra_alpha > 0:
+                try:
+                    ok = await transfer_alpha(
+                        subtensor=st,
+                        wallet=wallet,
+                        hotkey_ss58=args.source_hotkey,
+                        origin_and_dest_netuid=args.netuid,
+                        dest_coldkey_ss58=args.treasury,
+                        amount=bt.Balance.from_tao(5),
+                        wait_for_inclusion=True,
+                        wait_for_finalization=False,
+                    )
+                except Exception as exc:
+                    warn(f"transfer_alpha failed: {exc}")
+                    ok = False
+                if ok:
+                    alpha_sent += 5
+                    clog.success(f"AUTO‑BID sent {extra_alpha} α "
+                                f"(cum {5}) "
+                                f"{_fmt_margin(future_margin, colour=False)}")
+                autobit_count += 1
 
         await asyncio.sleep(args.interval)
 
