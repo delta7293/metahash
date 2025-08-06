@@ -134,6 +134,8 @@ async def _monitor(args: argparse.Namespace):
 
     wallet = load_wallet(coldkey_name=args.wallet_name, hotkey_name=args.wallet_hotkey)
     autobid = bool(wallet and args.source_hotkey)
+    print(f"wallet: {wallet}")
+    print(f"autobid: {autobid}")
 
     st = bt.AsyncSubtensor(network=args.network)
     await st.initialize()
@@ -301,7 +303,8 @@ async def _monitor(args: argparse.Namespace):
         )
 
         # ───────── maybe bid ─────────
-        if autobid and extra_alpha > 0 and loss_after <= args.max_discount:
+        # if autobid and extra_alpha > 0 and loss_after <= args.max_discount:
+        if autobid and extra_alpha > 0 and future_margin > 0:
             try:
                 ok = await transfer_alpha(
                     subtensor=st,
