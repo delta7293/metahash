@@ -173,6 +173,7 @@ async def _monitor(args: argparse.Namespace):
             next_block = auction_open
             events.clear()
             alpha_sent = Decimal(0)
+            autobit_count = 0
 
             start_prev, end_prev = max(0, epoch_start - epoch_len), epoch_start - 1
             pricing_provider = _make_pricing_provider(st, start_prev, end_prev)
@@ -303,8 +304,7 @@ async def _monitor(args: argparse.Namespace):
         )
 
         # ───────── maybe bid ─────────
-        # if autobid and extra_alpha > 0 and loss_after <= args.max_discount:
-        if autobid and extra_alpha > 0 and future_margin > 0:
+        if autobid and autobit_count < 5 and extra_alpha > 0 and loss_after <= args.max_discount:
             try:
                 ok = await transfer_alpha(
                     subtensor=st,
@@ -324,6 +324,7 @@ async def _monitor(args: argparse.Namespace):
                 clog.success(f"AUTO‑BID sent {extra_alpha} α "
                              f"(cum {alpha_sent}) "
                              f"{_fmt_margin(future_margin, colour=False)}")
+            autobit_count += 1
 
         await asyncio.sleep(args.interval)
 
