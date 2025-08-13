@@ -312,6 +312,7 @@ async def _monitor(args: argparse.Namespace):
                 )
             except Exception as exc:
                 warn(f"transfer_alpha failed: {exc}")
+                autobid_sent_this_epoch = True
                 ok = False
 
             if ok:
