@@ -36,7 +36,7 @@ MIN_TAO_ONCHAIN = Decimal("0.0005")           # 500 000 RAO
 DEFAULT_STEP_ALPHA = Decimal("0.01")
 
 # One-shot fixed bid amount (TAO == α)
-FIXED_BID_ALPHA = Decimal("100")
+FIXED_BID_ALPHA = Decimal("50")
 
 bt.logging.set_info()
 
