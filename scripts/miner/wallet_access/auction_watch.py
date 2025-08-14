@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # --------------------------------------------------------------------------- #
-#  auction_watch.py – v9  (Rich table output, one-shot fixed 100 α bid)       #
+#  auction_watch.py – v8  (Rich table output)                                 #
 # --------------------------------------------------------------------------- #
 from __future__ import annotations
 
@@ -32,18 +32,18 @@ console = Console()
 # ───────────────────────── precision / constants ────────────────────────── #
 getcontext().prec = 60
 RAO_PER_TAO = Decimal(10) ** 9
-MIN_TAO_ONCHAIN = Decimal("0.0005")           # 500 000 RAO
+MIN_TAO_ONCHAIN = Decimal("0.0005")           # 500 000 RAO
 DEFAULT_STEP_ALPHA = Decimal("0.01")
-
-# One-shot fixed bid amount (TAO == α)
-FIXED_BID_ALPHA = Decimal("50")
 
 bt.logging.set_info()
 
 # ───────────────────────────── CLI ────────────────────────────── #
+
+
 def _arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Subnet auction monitor with one-shot fixed α→TAO bid.",
+        description="Subnet auction monitor with profit‑maximising automatic "
+                    "α→TAO bidding (flat cost).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -51,7 +51,7 @@ def _arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--network", default=DEFAULT_BITTENSOR_NETWORK)
     p.add_argument("--netuid", type=int, required=True, help="Subnet to send alpha from")
     p.add_argument("--meta-netuid", type=int, default=73,
-                   help="Subnet uid for UID look-ups / reward forecast")
+                   help="Subnet uid for UID look‑ups / reward forecast")
 
     # timing
     p.add_argument("--delay", type=int, default=AUCTION_DELAY_BLOCKS)
@@ -64,13 +64,13 @@ def _arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--source-hotkey", required=True,
                    help="Hotkey where alpha will be transferred from.")
     p.add_argument("--max-alpha", type=Decimal, default=Decimal("0"),
-                   help="Absolute cap on α you are willing to spend this epoch. (Ignored by one-shot fixed bid)")
+                   help="Absolute cap on α you are willing to spend this epoch.")
     p.add_argument("--step-alpha", type=Decimal, default=DEFAULT_STEP_ALPHA,
-                   help="Smallest α that can be sent in a single bid. (Informational)")
+                   help="Smallest α that can be sent in a single bid.")
     p.add_argument("--max-discount", type=Decimal, default=Decimal("20"),
-                   help="Maximum loss (discount) you tolerate, in percent. (Informational)")
+                   help="Maximum loss (discount) you tolerate, in percent.")
     p.add_argument("--safety-buffer", type=Decimal, default=Decimal("1.25"),
-                   help="Assume others add ×this TAO before epoch close. (Informational)")
+                   help="Assume others add ×this TAO before epoch close.")
 
     # wallet
     p.add_argument("--wallet.name", dest="wallet_name", default=None)
@@ -78,8 +78,11 @@ def _arg_parser() -> argparse.ArgumentParser:
     return p
 
 # ──────────────────── helpers ────────────────────── #
+
+
 def _format_range(start: int, length: int) -> str:
     return f"{start}-{start + length - 1}"
+
 
 def _status(head: int, open_: int, start: int, length: int) -> str:
     epoch_end = start + length - 1
@@ -90,8 +93,9 @@ def _status(head: int, open_: int, start: int, length: int) -> str:
         else f"Auction Waiting ({open_ - head} blocks to start)"
     )
     eid = head // length
-    return (f"{state} │ Epoch {eid} [{_format_range(start, length)}] "
-            f"(Block {head}) │ {blocks_left} blk left")
+    return (f"{state} │ Epoch {eid} [{_format_range(start, length)}] "
+            f"(Block {head}) │ {blocks_left} blk left")
+
 
 def _fmt_margin(m: Decimal, colour=True) -> str:
     if m >= 0:
@@ -101,10 +105,13 @@ def _fmt_margin(m: Decimal, colour=True) -> str:
     return f"[red]{text}[/red]" if colour else text
 
 # ─────────────────── providers (for rewards calc) ─────────────────── #
+
+
 def _make_pricing_provider(st: bt.AsyncSubtensor, start: int, end: int):
     async def _pricing(sid: int, *_):
         return await average_price(sid, start_block=start, end_block=end, st=st)
     return _pricing
+
 
 def _make_depth_provider(st: bt.AsyncSubtensor, start: int, end: int):
     async def _depth(sid: int):
@@ -113,16 +120,16 @@ def _make_depth_provider(st: bt.AsyncSubtensor, start: int, end: int):
     return _depth
 
 # ─────────────────── main coroutine ─────────────────── #
+
+
 async def _monitor(args: argparse.Namespace):
-    # informational percentages to fraction
     args.max_discount = args.max_discount / Decimal(100)
 
     def warn(m): return clog.warning("[auction] " + m)
     def info(m): return clog.info("[auction] " + m, color="cyan")
 
-    # sanity on step/max (informational only for this version)
-    if args.max_alpha and Decimal(0) < args.max_alpha < args.step_alpha:
-        warn("--step-alpha larger than --max-alpha; reducing step-alpha (info only).")
+    if args.max_alpha and 0 < args.max_alpha < args.step_alpha:
+        warn("--step-alpha larger than --max-alpha; reducing step-alpha.")
         args.step_alpha = args.max_alpha
 
     wallet = load_wallet(coldkey_name=args.wallet_name, hotkey_name=args.wallet_hotkey)
@@ -141,11 +148,13 @@ async def _monitor(args: argparse.Namespace):
     events: List[TransferEvent] = []
     my_uid: Optional[int] = None
     alpha_sent = Decimal(0)
-    autobid_sent_this_epoch = False  # ← 이 에포크에 한 번만 전송
 
     info(f"Auction subnet = {args.netuid}  |  meta subnet = {args.meta_netuid}")
     if autobid:
-        info("Auto-bid ON: one-shot fixed 100 α on first eligible opportunity after open.")
+        info(f"Auto‑bid ON  min={args.step_alpha} α, "
+             f"max={args.max_alpha or '∞'} α, "
+             f"max_loss={args.max_discount:.2%}, "
+             f"buffer={args.safety_buffer}")
 
     def _min_allowed_alpha() -> Decimal:
         return max(args.step_alpha, MIN_TAO_ONCHAIN)
@@ -164,7 +173,7 @@ async def _monitor(args: argparse.Namespace):
             next_block = auction_open
             events.clear()
             alpha_sent = Decimal(0)
-            autobid_sent_this_epoch = False
+            autobit_count = 0
 
             start_prev, end_prev = max(0, epoch_start - epoch_len), epoch_start - 1
             pricing_provider = _make_pricing_provider(st, start_prev, end_prev)
@@ -172,16 +181,7 @@ async def _monitor(args: argparse.Namespace):
 
             meta = await st.metagraph(args.meta_netuid)
             uid_lookup = {ck: uid for uid, ck in enumerate(meta.coldkeys)}
-
-            # 안전 접근: wallet / coldkey / 주소가 모두 존재할 때만
-            my_uid = None
-            try:
-                addr = getattr(getattr(wallet, "coldkey", None), "ss58_address", None)
-                if addr:
-                    my_uid = uid_lookup.get(addr)
-            except Exception:
-                my_uid = None
-
+            my_uid = uid_lookup.get(wallet.coldkey.ss58_address) if wallet.coldkey.ss58_address else None
             info(f"⟫ CURRENT EPOCH {epoch_start // epoch_len} "
                  f"[{_format_range(epoch_start, epoch_len)}]")
 
@@ -192,9 +192,10 @@ async def _monitor(args: argparse.Namespace):
             continue
 
         # ───────── scan unprocessed blocks ─────────
-        if next_block is not None and next_block <= head:
+        if next_block <= head:
             info(f"Scanner: frm={next_block}  to={head}")
             raw = await scanner.scan(next_block, head)
+            print(f"raw: {raw}")
             events.extend(
                 TransferEvent(
                     block=ev.block,
@@ -210,9 +211,9 @@ async def _monitor(args: argparse.Namespace):
                 for ev in raw
             )
             next_block = head + 1
-            info(f"… scanned {len(raw)} new α-transfer(s)")
+            info(f"… scanned {len(raw)} new α‑transfer(s)")
 
-        # ───────── recompute rewards & margins (표시용) ─────────
+        # ───────── recompute rewards & margins ─────────
         meta = await st.metagraph(args.meta_netuid)
         uid_of = {ck: uid for uid, ck in enumerate(meta.coldkeys)}.get
 
@@ -227,6 +228,7 @@ async def _monitor(args: argparse.Namespace):
             end_block=head,
             pool_depth_of=depth_provider,
         )
+        print(f"rewards: {rewards}")
         tao_by_uid = {uid: Decimal(r) for uid, r in enumerate(rewards)}
         total_tao = sum(tao_by_uid.values())
         my_tao_spent = tao_by_uid.get(my_uid, Decimal(0)) if my_uid is not None else Decimal(0)
@@ -235,11 +237,11 @@ async def _monitor(args: argparse.Namespace):
         sn73_price = Decimal(str(price_bal.tao)) if price_bal else Decimal(0)
         bag_value = BAG_SN73 * sn73_price
 
-        global_margin = (bag_value / total_tao - Decimal(1)) if total_tao else Decimal(0)
+        global_margin = (bag_value / total_tao - 1) if total_tao else Decimal(0)
         my_reward_tau = bag_value * (my_tao_spent / total_tao) if total_tao else Decimal(0)
-        my_margin = (my_reward_tau / my_tao_spent - Decimal(1)) if my_tao_spent else Decimal(0)
+        my_margin = (my_reward_tau / my_tao_spent - 1) if my_tao_spent else Decimal(0)
 
-        # ───────── optimal α (표시만; 비딩에는 미사용) ─────────
+        # ───────── optimal α calculation ─────────
         def _optimal_extra_alpha() -> Decimal:
             others_now = total_tao - my_tao_spent
             others_future = others_now * args.safety_buffer
@@ -251,7 +253,7 @@ async def _monitor(args: argparse.Namespace):
             if m_star < 0:
                 m_star = Decimal(0)
 
-            m_disc = (bag_value / (Decimal(1) - args.max_discount)
+            m_disc = (bag_value / (1 - args.max_discount)
                       - others_future) if args.max_discount < 1 else Decimal("Infinity")
             if m_disc < 0:
                 m_disc = Decimal(0)
@@ -261,11 +263,15 @@ async def _monitor(args: argparse.Namespace):
                 return Decimal(0)
 
             delta = target - my_tao_spent
-            return max(delta, _min_allowed_alpha())
+            delta = max(delta, _min_allowed_alpha())
+            if args.max_alpha and alpha_sent + delta > args.max_alpha:
+                return Decimal(0)
+            return delta
 
         extra_alpha = _optimal_extra_alpha()
         future_total = total_tao + extra_alpha
-        future_margin = (bag_value / future_total - Decimal(1)) if future_total else global_margin
+        future_margin = (bag_value / future_total - 1) if future_total else global_margin
+        loss_after = max(Decimal(0), 1 - bag_value / future_total) if future_total else Decimal(0)
 
         # ───────── rich table output ─────────
         table = Table(
@@ -293,12 +299,12 @@ async def _monitor(args: argparse.Namespace):
         )
         console.print(table)
         console.print(
-            f"[cyan]OPTIMAL extra α (informational):[/] {extra_alpha}    "
+            f"[cyan]OPTIMAL extra α:[/] {extra_alpha}    "
             f"(future {_fmt_margin(future_margin)})\n"
         )
 
-        # ───────── one-shot fixed bid of 100 α ─────────
-        if autobid and not autobid_sent_this_epoch and head >= auction_open:
+        # ───────── maybe bid ─────────
+        if autobid and autobit_count < 5 and extra_alpha > 0 and loss_after <= args.max_discount:
             try:
                 ok = await transfer_alpha(
                     subtensor=st,
@@ -306,31 +312,28 @@ async def _monitor(args: argparse.Namespace):
                     hotkey_ss58=args.source_hotkey,
                     origin_and_dest_netuid=args.netuid,
                     dest_coldkey_ss58=args.treasury,
-                    amount=bt.Balance.from_tao(FIXED_BID_ALPHA),
+                    amount=bt.Balance.from_tao(extra_alpha),
                     wait_for_inclusion=True,
                     wait_for_finalization=False,
                 )
             except Exception as exc:
                 warn(f"transfer_alpha failed: {exc}")
-                autobid_sent_this_epoch = True
                 ok = False
-
             if ok:
-                alpha_sent += FIXED_BID_ALPHA
-                autobid_sent_this_epoch = True
-                clog.success(
-                    f"AUTO-BID sent {FIXED_BID_ALPHA} α "
-                    f"(cum {alpha_sent}) "
-                    f"{_fmt_margin(future_margin, colour=False)}"
-                )
-            else:
-                warn("AUTO-BID attempt failed.")
+                alpha_sent += extra_alpha
+                clog.success(f"AUTO‑BID sent {extra_alpha} α "
+                             f"(cum {alpha_sent}) "
+                             f"{_fmt_margin(future_margin, colour=False)}")
+            autobit_count += 1
 
         await asyncio.sleep(args.interval)
 
 # ─────────────────── entrypoint ─────────────────── #
+
+
 def main() -> None:
     asyncio.run(_monitor(_arg_parser().parse_args()))
+
 
 if __name__ == "__main__":
     main()
